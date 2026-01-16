@@ -23,4 +23,4 @@
 Clone the repository, install dependencies, and run the development server all in one step:
 
 ```bash
-git clone https://github.com/yourusername/agrismart.git && cd agrismart && npm install && npm run dev
+git clone https://github.com/Gowri1703/agrismart.git && cd agrismart && npm install && npm run dev
