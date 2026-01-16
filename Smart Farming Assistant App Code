@@ -1,0 +1,252 @@
+import { useState, useEffect } from 'react';
+import { ProfileSetup } from '@/app/components/ProfileSetup';
+import { ProfileScreen } from '@/app/components/ProfileScreen';
+import { Dashboard } from '@/app/components/Dashboard';
+import { WeatherScreen } from '@/app/components/WeatherScreen';
+import { CropAdvisoryScreen } from '@/app/components/CropAdvisoryScreen';
+import { PestDetectionScreen } from '@/app/components/PestDetectionScreen';
+import { MarketPricesScreen } from '@/app/components/MarketPricesScreen';
+import { SoilHealthScreen } from '@/app/components/SoilHealthScreen';
+import { ChatbotScreen } from '@/app/components/ChatbotScreen';
+import { SettingsScreen } from '@/app/components/SettingsScreen';
+import {
+  farmerProfileStorage,
+  weatherStorage,
+  advisoryStorage,
+  marketPricesStorage,
+  syncStorage,
+} from '@/app/utils/offline-storage';
+import {
+  mockWeatherData,
+  mockCropAdvisories,
+  mockMarketPrices,
+} from '@/app/utils/mock-data';
+import { Toaster } from '@/app/components/ui/sonner';
+import { toast } from 'sonner';
+
+type Screen =
+  | 'profile'
+  | 'profileView'
+  | 'dashboard'
+  | 'weather'
+  | 'advisory'
+  | 'pest'
+  | 'soil'
+  | 'market'
+  | 'chatbot'
+  | 'settings';
+
+export default function App() {
+  const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Check if profile exists
+  useEffect(() => {
+    const profile = farmerProfileStorage.get();
+    if (!profile) {
+      setCurrentScreen('profile');
+    } else {
+      // Initialize mock data if not present
+      initializeMockData();
+    }
+  }, []);
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      syncStorage.setOnlineStatus(true);
+      toast.success('You are now online!', {
+        description: 'Syncing latest data...',
+      });
+      syncData();
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      syncStorage.setOnlineStatus(false);
+      toast.warning('You are offline', {
+        description: 'Using cached data. Some features may be limited.',
+      });
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const initializeMockData = () => {
+    // Initialize weather data if not present
+    if (!weatherStorage.get()) {
+      weatherStorage.set(mockWeatherData);
+    }
+
+    // Initialize crop advisories if not present
+    if (advisoryStorage.get().length === 0) {
+      advisoryStorage.set(mockCropAdvisories);
+    }
+
+    // Initialize market prices if not present
+    if (marketPricesStorage.get().length === 0) {
+      marketPricesStorage.set(mockMarketPrices);
+    }
+  };
+
+  const syncData = () => {
+    if (!isOnline) {
+      toast.error('Cannot sync', {
+        description: 'Please connect to the internet to sync data.',
+      });
+      return;
+    }
+
+    setIsSyncing(true);
+
+    // Simulate API sync
+    setTimeout(() => {
+      // Update weather data
+      weatherStorage.set({
+        ...mockWeatherData,
+        lastSync: new Date().toISOString(),
+      });
+
+      // Update crop advisories
+      advisoryStorage.set(
+        mockCropAdvisories.map((advisory) => ({
+          ...advisory,
+          lastSync: new Date().toISOString(),
+        }))
+      );
+
+      // Update market prices
+      marketPricesStorage.set(
+        mockMarketPrices.map((price) => ({
+          ...price,
+          lastSync: new Date().toISOString(),
+        }))
+      );
+
+      // Update last sync time
+      syncStorage.setLastSync(new Date().toISOString());
+
+      setIsSyncing(false);
+      toast.success('Sync complete!', {
+        description: 'All data has been updated.',
+      });
+    }, 2000);
+  };
+
+  const handleProfileComplete = () => {
+    initializeMockData();
+    setCurrentScreen('dashboard');
+    toast.success('Welcome to AgriSmart!', {
+      description: 'Your profile has been created successfully.',
+    });
+  };
+
+  const handleLogout = () => {
+    if (
+      confirm(
+        'Are you sure you want to logout? All cached data will be cleared.'
+      )
+    ) {
+      // Clear all data
+      localStorage.clear();
+      setCurrentScreen('profile');
+      toast.success('Logged out successfully', {
+        description: 'All data has been cleared.',
+      });
+    }
+  };
+
+  const handleNavigate = (screen: string) => {
+    setCurrentScreen(screen as Screen);
+  };
+
+  const profile = farmerProfileStorage.get();
+  const lastSync = syncStorage.getLastSync();
+
+  return (
+    <div className="max-w-md mx-auto bg-white min-h-screen">
+      {currentScreen === 'profile' && (
+        <ProfileSetup onComplete={handleProfileComplete} />
+      )}
+
+      {currentScreen === 'profileView' && profile && (
+        <ProfileScreen
+          onBack={() => setCurrentScreen('dashboard')}
+          onEdit={() => setCurrentScreen('profile')}
+          onLogout={handleLogout}
+        />
+      )}
+
+      {currentScreen === 'dashboard' && profile && (
+        <Dashboard
+          farmerName={profile.name}
+          isOnline={isOnline}
+          lastSync={lastSync}
+          onNavigate={handleNavigate}
+          onSync={syncData}
+          isSyncing={isSyncing}
+        />
+      )}
+
+      {currentScreen === 'weather' && (
+        <WeatherScreen
+          onBack={() => setCurrentScreen('dashboard')}
+          isOnline={isOnline}
+        />
+      )}
+
+      {currentScreen === 'advisory' && (
+        <CropAdvisoryScreen
+          onBack={() => setCurrentScreen('dashboard')}
+          isOnline={isOnline}
+        />
+      )}
+
+      {currentScreen === 'pest' && (
+        <PestDetectionScreen
+          onBack={() => setCurrentScreen('dashboard')}
+          isOnline={isOnline}
+        />
+      )}
+
+      {currentScreen === 'soil' && (
+        <SoilHealthScreen
+          onBack={() => setCurrentScreen('dashboard')}
+          isOnline={isOnline}
+        />
+      )}
+
+      {currentScreen === 'market' && (
+        <MarketPricesScreen
+          onBack={() => setCurrentScreen('dashboard')}
+          isOnline={isOnline}
+        />
+      )}
+
+      {currentScreen === 'chatbot' && (
+        <ChatbotScreen
+          onBack={() => setCurrentScreen('dashboard')}
+          isOnline={isOnline}
+        />
+      )}
+
+      {currentScreen === 'settings' && (
+        <SettingsScreen
+          onBack={() => setCurrentScreen('dashboard')}
+          isOnline={isOnline}
+          onLogout={handleLogout}
+        />
+      )}
+
+      <Toaster position="top-center" richColors />
+    </div>
+  );
+}
